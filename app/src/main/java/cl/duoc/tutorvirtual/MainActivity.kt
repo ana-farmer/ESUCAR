@@ -32,6 +32,12 @@ fun TutorVirtualApp() {
     BackHandler(enabled = pantalla != "Inicio") { pantalla = "Inicio" }
 
     Scaffold(
+        // La guía tiene su propio Scaffold y su encabezado gestiona el espacio superior.
+        contentWindowInsets = if (pantalla == "Guía metodológica") {
+            WindowInsets(0, 0, 0, 0)
+        } else {
+            ScaffoldDefaults.contentWindowInsets
+        },
         topBar = {
             if (pantalla != "Guía metodológica") {
                 Surface(color = MaterialTheme.colorScheme.primary) {
@@ -54,7 +60,7 @@ fun TutorVirtualApp() {
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             when (pantalla) {
                 "Inicio" -> HomeScreen(
                     onNavigateToGuia = { pantalla = "Guía metodológica" },
