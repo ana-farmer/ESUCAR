@@ -92,17 +92,17 @@ fun HitoCardItem(
             Surface(
                 color = if (estado.contains("Aprobado")) EstadoAprobado else CarabinerosVerde,
                 shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = estado,
-                    color = Color.White, `
-                            modifier = Modifier.padding
-                )
 
-            }
+            ) {
+            Text(
+                text = estado,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
         }
     }
-}
 }
 
 

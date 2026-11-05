@@ -12,11 +12,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cl.duoc.tutorvirtual.ui.screens.GuiaMetodologicaScreen
+import cl.duoc.tutorvirtual.ui.theme.TutorVirtualESUCARTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme { TutorVirtualApp() } }
+
+        setContent {
+            // ⚠️ Forzamos dynamicColor = false para ignorar el morado de Android 12+
+            TutorVirtualESUCARTheme(
+                darkTheme = false,
+                dynamicColor = false
+            ) {
+                GuiaMetodologicaScreen()
+            }
+        }
     }
 }
 
