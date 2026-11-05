@@ -5,26 +5,22 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cl.duoc.tutorvirtual.ui.screens.GuiaMetodologicaScreen
+import cl.duoc.tutorvirtual.ui.screens.HomeScreen
+import cl.duoc.tutorvirtual.ui.screens.HitosScreen
 import cl.duoc.tutorvirtual.ui.theme.TutorVirtualESUCARTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContent {
-            // ⚠️ Forzamos dynamicColor = false para ignorar el morado de Android 12+
-            TutorVirtualESUCARTheme(
-                darkTheme = false,
-                dynamicColor = false
-            ) {
-                GuiaMetodologicaScreen()
+            TutorVirtualESUCARTheme(darkTheme = false, dynamicColor = false) {
+                TutorVirtualApp()
             }
         }
     }
@@ -32,56 +28,48 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun TutorVirtualApp() {
-    var pantalla by remember { mutableStateOf("Inicio") }
-
-    BackHandler(enabled = pantalla != "Inicio") {
-        pantalla = "Inicio"
-    }
+    var pantalla by rememberSaveable { mutableStateOf("Inicio") }
+    BackHandler(enabled = pantalla != "Inicio") { pantalla = "Inicio" }
 
     Scaffold(
         topBar = {
-            Surface(tonalElevation = 3.dp) {
-                Text(
-                    "Tutor Virtual ESUCAR",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.fillMaxWidth().padding(20.dp)
-                )
+            if (pantalla != "Guía metodológica") {
+                Surface(color = MaterialTheme.colorScheme.primary) {
+                    Text(
+                        "Tutor Virtual ESUCAR",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.fillMaxWidth().padding(20.dp)
+                    )
+                }
+            }
+        },
+        bottomBar = {
+            if (pantalla != "Inicio") {
+                Surface {
+                    OutlinedButton(
+                        onClick = { pantalla = "Inicio" },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
+                    ) { Text("Volver al inicio") }
+                }
             }
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (pantalla) {
-                "Inicio" -> {
-                    Text("Bienvenido al Tutor Virtual",
-                        style = MaterialTheme.typography.headlineSmall)
-                    Text("Apoyo para Trabajo de Título I, II y III.")
-                    listOf("Guía metodológica", "Preguntas frecuentes",
-                        "Mis avances", "Mi perfil").forEach { destino ->
-                        Button(
-                            onClick = { pantalla = destino },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text(destino) }
-                    }
-                }
-                "Guía metodológica" -> {
-                    GuiaMetodologicaScreen()
-                    OutlinedButton(onClick = { pantalla = "Inicio" }) {
-                        Text("Volver al inicio")
-                    }
-                }
-                else -> {
+                "Inicio" -> HomeScreen(
+                    onNavigateToGuia = { pantalla = "Guía metodológica" },
+                    onNavigateToFaq = { pantalla = "Preguntas frecuentes" },
+                    onNavigateToHitos = { pantalla = "Mis avances" },
+                    onNavigateToPerfil = { pantalla = "Mi perfil" }
+                )
+                "Guía metodológica" -> GuiaMetodologicaScreen()
+                "Mis avances" -> HitosScreen()
+                else -> Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Text(pantalla, style = MaterialTheme.typography.headlineMedium)
                     Text("Módulo preparado para próximas actividades.")
-                    OutlinedButton(onClick = { pantalla = "Inicio" }) {
-                        Text("Volver al inicio")
-                    }
                 }
             }
         }
