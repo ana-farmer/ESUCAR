@@ -12,10 +12,18 @@ private val LightColorScheme = lightColorScheme(
     primaryContainer = CarabinerosVerdeClaro,
     onPrimaryContainer = TextoOscuro,
     secondary = EsucarDorado,
-    onSecondary = TarjetaBlanca,
+    onSecondary = TextoPrincipal,
+    secondaryContainer = CarabinerosVerdeClaro,
+    onSecondaryContainer = TextoPrincipal,
+    tertiary = EsucarDorado,
+    onTertiary = TextoPrincipal,
     background = FondoSuperficie,
+    onBackground = TextoPrincipal,
     surface = TarjetaBlanca,
-    onSurface = TextoOscuro
+    onSurface = TextoOscuro,
+    surfaceVariant = CarabinerosVerdeClaro,
+    onSurfaceVariant = TextoOscuro,
+    surfaceTint = CarabinerosVerde
 )
 
 private val DarkColorScheme = darkColorScheme(
