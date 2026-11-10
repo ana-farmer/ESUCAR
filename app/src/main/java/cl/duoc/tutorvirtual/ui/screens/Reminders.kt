@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import cl.duoc.tutorvirtual.MainActivity
 import cl.duoc.tutorvirtual.viewmodel.TutorState
+import cl.duoc.tutorvirtual.data.repository.AcademicContent
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -28,7 +29,7 @@ import java.util.*
             val pending = PendingIntent.getBroadcast(context, i, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             alarms.cancel(pending)
             val date = runCatching { SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }.parse(state.value("date_$i")) }.getOrNull()
-            if (date != null && state.value("sent_$i") != "true") {
+            if (date != null && AcademicContent.needsStudentAction(AcademicContent.hitos(state.values)[i])) {
                 val time = Calendar.getInstance().apply { time = date; set(Calendar.HOUR_OF_DAY, 9) }.timeInMillis
                 if (time > System.currentTimeMillis()) { alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, pending); count++ }
             }

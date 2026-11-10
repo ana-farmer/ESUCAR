@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -27,6 +30,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -40,6 +44,9 @@ import androidx.window.core.layout.WindowSizeClass
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import cl.duoc.tutorvirtual.data.model.DemoProfiles
 import cl.duoc.tutorvirtual.data.model.EstadoHito
 import cl.duoc.tutorvirtual.data.repository.AcademicContent
 import cl.duoc.tutorvirtual.data.repository.GuiaRepository
@@ -48,8 +55,7 @@ import cl.duoc.tutorvirtual.viewmodel.*
 import java.io.File
 import kotlinx.coroutines.launch
 
-private val destinations = listOf("inicio" to "Inicio", "unidades" to "Unidades", "anteproyecto" to "Anteproyecto", "avances" to "Avances")
-private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.ic_edit, R.drawable.ic_chart)
+private val destinations = listOf("inicio" to "Ruta", "tutor" to "Tutor", "biblioteca" to "Biblioteca")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun EsucarApp(vm: TutorViewModel = viewModel()) {
@@ -58,58 +64,81 @@ private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val entry by nav.currentBackStackEntryAsState()
-    val route = entry?.destination?.route ?: "bienvenida"
+    val route = entry?.destination?.route?.substringBefore("?") ?: "bienvenida"
     fun go(r: String) { nav.navigate(r) { launchSingleTop = true } }
-    if (!state.loaded) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
-    val startRoute = remember { if (state.value("welcomed") == "true") "inicio" else "bienvenida" }
+    if (!state.loaded) { WelcomeScreen(state = state, onStart = {}); return }
+    var showProfiles by rememberSaveable { mutableStateOf(false) }
+    var displayedProfile by rememberSaveable { mutableStateOf(state.activeProfileId) }
+    LaunchedEffect(state.activeProfileId) {
+        if (displayedProfile != state.activeProfileId) {
+            nav.navigate("inicio") { popUpTo(nav.graph.id) { inclusive = false }; launchSingleTop = true }
+            drawer.close()
+            displayedProfile = state.activeProfileId
+        }
+    }
+    if (showProfiles) ProfileSwitcher(state, { showProfiles = false }, vm::switchProfile)
+    val menuDestinations = if (state.isTeacher) listOf("inicio" to "Estudiantes", "revisiones" to "Revisiones", "unidades" to "Guía metodológica", "biblioteca" to "Biblioteca", "perfil" to "Mi perfil")
+        else destinations + listOf("unidades" to "Guía metodológica", "anteproyecto" to "Mi anteproyecto", "avances" to "Mis avances", "perfil" to "Mi perfil")
     ModalNavigationDrawer(
         drawerState = drawer,
         gesturesEnabled = route != "bienvenida",
         drawerContent = {
             ModalDrawerSheet(drawerContainerColor = FondoSuperficie) {
                 Text("Tutor Virtual ESUCAR", style = MaterialTheme.typography.titleLarge, color = CarabinerosVerde, fontWeight = FontWeight.Bold, modifier = Modifier.padding(24.dp))
-                (destinations + listOf("tutor" to "Tutor Virtual", "biblioteca" to "Biblioteca", "perfil" to "Mi perfil")).forEach { (destination, label) ->
+                menuDestinations.forEach { (destination, label) ->
                     NavigationDrawerItem(label = { Text(label) }, selected = route == destination,
                         onClick = { go(destination); scope.launch { drawer.close() } },
                         colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = CarabinerosVerdeClaro, selectedTextColor = CarabinerosVerde))
                 }
+                TextButton(onClick = { showProfiles = true }, modifier = Modifier.padding(16.dp)) { Text("Cambiar de perfil") }
             }
         }
     ) {
     Scaffold(
-        containerColor = if (route == "bienvenida") CarabinerosVerde else FondoSuperficie,
+        containerColor = if (route == "bienvenida") CarabinerosVerde else RoutePaper,
+        contentWindowInsets = if (route == "inicio") WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
         topBar = {
-            if (route != "bienvenida") TopAppBar(
+            if (route != "bienvenida" && route != "inicio") TopAppBar(
                 title = { Column {
-                    Text(when(route) { "inicio" -> "Tutor Virtual ESUCAR"; "unidades" -> "Mis Unidades"; "anteproyecto" -> "Mi Anteproyecto"; "avances" -> "Mis Avances"; "tutor" -> "Tutor Virtual"; "biblioteca" -> "Biblioteca"; "perfil" -> "Mi Perfil"; else -> "Guía metodológica" }, fontWeight = FontWeight.Bold)
+                    Text(when(route) { "inicio" -> "Tutor Virtual ESUCAR"; "unidades" -> "Mis Unidades"; "anteproyecto" -> "Mi Anteproyecto"; "avances" -> "Mis Avances"; "tutor" -> "Tutor Virtual"; "biblioteca" -> "Biblioteca"; "perfil" -> "Mi Perfil"; "revisiones" -> "Entregas del estudiante"; "revision" -> "Revisión de entrega"; else -> "Guía metodológica" }, fontWeight = FontWeight.Bold)
                     Text("Trabajo de Título · ESUCAR", style = MaterialTheme.typography.labelMedium, color = CarabinerosVerdeClaro)
                 } },
                 navigationIcon = { if (route == "inicio") IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(painterResource(R.drawable.ic_menu), "Abrir menú", tint = TarjetaBlanca) } else TextButton(onClick = { if (!nav.popBackStack()) go("inicio") }, modifier = Modifier.semantics { contentDescription = "Volver a la pantalla anterior" }) { Text("‹", color = TarjetaBlanca, style = MaterialTheme.typography.headlineMedium) } },
-                actions = { IconButton(onClick = { go("avances") }) { Icon(painterResource(R.drawable.ic_bell), "Hitos y recordatorios", tint = TarjetaBlanca) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = CarabinerosVerde, titleContentColor = TarjetaBlanca)
+                actions = { IconButton(onClick = { go(if (state.isTeacher) "revisiones" else "avances") }) { Icon(painterResource(R.drawable.ic_bell), "Hitos y recordatorios", tint = TarjetaBlanca) } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = RouteForest, titleContentColor = TarjetaBlanca)
             )
         },
         bottomBar = {
-            if (route != "bienvenida") NavigationBar(containerColor = TarjetaBlanca) {
-                destinations.forEachIndexed { i, (r, title) -> NavigationBarItem(
-                    modifier = Modifier.testTag("nav_$r"),
-                    selected = route == r,
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = CarabinerosVerde, selectedTextColor = CarabinerosVerde, indicatorColor = CarabinerosVerdeClaro, unselectedIconColor = TextoPrincipal, unselectedTextColor = TextoPrincipal),
-                    onClick = { nav.navigate(r) { popUpTo("inicio") { saveState = true }; launchSingleTop = true; restoreState = true } },
-                    icon = { Icon(painterResource(symbols[i]), contentDescription = null) }, label = { Text(title) }
-                ) }
+            if (route != "bienvenida") JourneyNavigation(route, state.isTeacher) { destination ->
+                nav.navigate(destination) { popUpTo("inicio") { saveState = true }; launchSingleTop = true; restoreState = true }
             }
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+            if (route != "bienvenida" && route != "inicio") DemoProfileBar(state) { showProfiles = true }
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-            NavHost(nav, startDestination = startRoute, modifier = Modifier.weight(1f)) {
-                composable("bienvenida") { Welcome { vm.save(mapOf("welcomed" to "true")); nav.navigate("inicio") { popUpTo("bienvenida") { inclusive = true } } } }
-                composable("inicio") { Dashboard(state, ::go) }
+            NavHost(nav, startDestination = "bienvenida", modifier = Modifier.weight(1f)) {
+                composable("bienvenida") { WelcomeScreen(state = state, onStart = { nav.navigate("inicio") { popUpTo("bienvenida") { inclusive = true }; launchSingleTop = true } }) }
+                composable("inicio") {
+                    if (state.isTeacher) TeacherDashboard(state, { scope.launch { drawer.open() } }, { showProfiles = true }, ::go)
+                    else RutaScreen(state, ::go, onMenu = { scope.launch { drawer.open() } }, onSwitch = { showProfiles = true })
+                }
                 composable("unidades") { Units { go("etapa/$it") } }
                 composable("etapa/{id}") { back -> Stage(back.arguments?.getString("id")?.toIntOrNull() ?: 1) }
-                composable("anteproyecto") { Project(state, vm::save) }
-                composable("avances") { Advances(state, vm::save) }
+                composable("anteproyecto?section={section}", arguments = listOf(navArgument("section") { type = NavType.IntType; defaultValue = -1 })) { entry ->
+                    if (state.isTeacher) RoleNotice { go("inicio") } else Project(state, vm::save, entry.arguments?.getInt("section") ?: -1)
+                }
+                composable("avances") {
+                    if (state.isTeacher) TeacherDeliveries(state) { go("revision?index=$it") }
+                    else Advances(state, vm::save, vm::submitHito, vm::withdrawHito)
+                }
+                composable("revisiones") {
+                    if (state.isTeacher) TeacherDeliveries(state) { go("revision?index=$it") } else RoleNotice { go("inicio") }
+                }
+                composable("revision?index={index}", arguments = listOf(navArgument("index") { type = NavType.IntType; defaultValue = 0 })) { entry ->
+                    if (state.isTeacher) TeacherReview(state, (entry.arguments?.getInt("index") ?: 0).coerceIn(0, 3), vm::reviewHito)
+                    else RoleNotice { go("inicio") }
+                }
                 composable("tutor") { Tutor() }
                 composable("biblioteca") { Library() }
                 composable("perfil") { Profile(state, vm::save) }
@@ -130,13 +159,13 @@ private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.
         Column(Modifier.widthIn(max = contentWidth).fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
     }
 }
-@Composable private fun Panel(content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth().animateContentSize(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = TarjetaBlanca), elevation = CardDefaults.cardElevation(2.dp)) {
+@Composable private fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Card(modifier.fillMaxWidth().animateContentSize(), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = RoutePaper), border = BorderStroke(1.dp, CarabinerosVerdeClaro), elevation = CardDefaults.cardElevation(0.dp)) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
 @Composable private fun Heading(title: String, detail: String = "") {
-    Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = CarabinerosVerde)
+    Text(title, style = MaterialTheme.typography.headlineSmall, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, color = RouteForest)
     if (detail.isNotEmpty()) Text(detail, style = MaterialTheme.typography.bodyMedium)
 }
 @Composable private fun Progress(value: Float) {
@@ -146,39 +175,6 @@ private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.
         LinearProgressIndicator(progress = { animated }, modifier = Modifier.fillMaxWidth().height(9.dp).clip(CircleShape), color = CarabinerosVerde, trackColor = CarabinerosVerdeClaro)
         Text("Apartados del anteproyecto completados", style = MaterialTheme.typography.labelMedium)
     }
-}
-@Composable private fun Welcome(start: () -> Unit) {
-    Column(Modifier.fillMaxSize().background(CarabinerosVerde).padding(32.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(26.dp, Alignment.CenterVertically)) {
-        EsucarLogo(Modifier.size(width = 152.dp, height = 196.dp))
-        Text("Tutor Virtual\nESUCAR", color = TarjetaBlanca, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-        Text("Trabajo de Título I, II y III", color = TarjetaBlanca, style = MaterialTheme.typography.titleLarge)
-        Text("Tu guía para avanzar, organizar tus ideas y construir tu anteproyecto.", color = TarjetaBlanca, style = MaterialTheme.typography.bodyLarge)
-        Button(onClick = start, colors = ButtonDefaults.buttonColors(containerColor = EsucarDorado, contentColor = TextoPrincipal), modifier = Modifier.fillMaxWidth().height(54.dp)) { Text("Comenzar  →") }
-        Text("Contenido disponible sin conexión", color = CarabinerosVerdeClaro)
-    }
-}
-@Composable private fun Dashboard(state: TutorState, go: (String) -> Unit) = Page {
-    Box(Modifier.width(40.dp).height(4.dp).background(EsucarDorado, CircleShape))
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        EsucarLogo(Modifier.size(width = 54.dp, height = 70.dp))
-        Column(Modifier.weight(1f)) {
-            Heading("Bienvenido al Tutor Virtual", state.value("name").ifBlank { "Continúa con el desarrollo de tu anteproyecto." })
-        }
-    }
-    Progress(state.progress)
-    Text("Tu espacio de aprendizaje", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-    val links = listOf(Triple("unidades", R.drawable.ic_book, "Mis Unidades"), Triple("anteproyecto", R.drawable.ic_edit, "Mi Anteproyecto"), Triple("tutor", R.drawable.ic_chat, "Tutor Virtual"), Triple("avances", R.drawable.ic_chart, "Mis avances"), Triple("biblioteca", R.drawable.ic_library, "Biblioteca"), Triple("perfil", R.drawable.ic_person, "Mi perfil"))
-    Box {
-        val columns = if (rememberWindowSizeClass().isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)) 3 else 2
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            links.chunked(columns).forEach { group -> Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                group.forEach { (route, icon, label) -> Card(onClick = { go(route) }, modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 112.dp), colors = CardDefaults.cardColors(containerColor = TarjetaBlanca), shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(2.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) { Icon(painterResource(icon), contentDescription = null, tint = CarabinerosVerde, modifier = Modifier.size(30.dp)); Text(label, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center) }
-                } }
-            } }
-        }
-    }
-    Panel { Text("Un paso a la vez", fontWeight = FontWeight.Bold, color = CarabinerosVerde); Text("Delimita el problema antes de redactar tus objetivos. Confirma los criterios de cada entrega con tu profesor guía.") }
 }
 @Composable private fun Units(open: (Int) -> Unit) = Page {
     Heading("Guía Metodológica ESUCAR", "Explora las etapas y aplica sus orientaciones a tu trabajo.")
@@ -199,14 +195,21 @@ private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.
         Text("Orientación didáctica. La pauta y las instrucciones de tu docente determinan los requisitos de entrega.", style = MaterialTheme.typography.bodySmall)
     }
 }
-@Composable private fun Project(state: TutorState, save: (Map<String, String>) -> Unit) = Page {
+@Composable private fun Project(state: TutorState, save: (Map<String, String>) -> Unit, initialSection: Int = -1) = Page {
     Heading("Construye tu anteproyecto", "Completa los apartados y guarda cada borrador antes de salir.")
     Progress(state.progress)
     AcademicContent.sections.forEachIndexed { i, title ->
-        var expanded by rememberSaveable { mutableStateOf(false) }
+        val target = remember { BringIntoViewRequester() }
+        LaunchedEffect(initialSection) {
+            if (i == initialSection) {
+                withFrameNanos { }
+                target.bringIntoView()
+            }
+        }
+        var expanded by rememberSaveable(initialSection) { mutableStateOf(initialSection == i) }
         var draft by rememberSaveable(state.value("draft_$i")) { mutableStateOf(state.value("draft_$i")) }
         var error by rememberSaveable { mutableStateOf(false) }
-        Panel {
+        Panel(Modifier.bringIntoViewRequester(target)) {
             Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }, verticalAlignment = Alignment.CenterVertically) {
                 Text("${i + 1}", color = CarabinerosVerde, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 14.dp))
                 Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -235,7 +238,7 @@ private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.
     if (results.isEmpty()) Panel { Text("No encontramos una respuesta. Prueba con «objetivo», «problema» o «referencia», o consulta a tu profesor guía.") }
     results.forEach { faq -> Panel { Text(faq.category, color = CarabinerosVerde, style = MaterialTheme.typography.labelMedium); Text(faq.question, fontWeight = FontWeight.Bold); Text(faq.answer) } }
 }
-@Composable private fun Advances(state: TutorState, save: (Map<String, String>) -> Unit) = Page {
+@Composable private fun Advances(state: TutorState, save: (Map<String, String>) -> Unit, submit: (Int) -> Unit, withdraw: (Int) -> Unit) = Page {
     Heading("Mis Hitos Académicos", "Registra tus envíos. La aprobación corresponde al profesor guía.")
     Progress(state.progress)
     AcademicContent.hitos(state.values).forEachIndexed { i, hito ->
@@ -243,7 +246,17 @@ private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.
         var invalid by rememberSaveable { mutableStateOf(false) }
         Panel {
             Text("Hito ${hito.id}: ${hito.titulo}", fontWeight = FontWeight.Bold)
-            Text(when(hito.estado) { EstadoHito.ENVIADO -> "Enviado · pendiente de revisión docente"; EstadoHito.EN_DESARROLLO -> "En desarrollo"; EstadoHito.APROBADO -> "Aprobado por el docente"; else -> "Por iniciar" }, color = CarabinerosVerde)
+            Text(hitoStatus(hito.estado), color = CarabinerosVerde, modifier = Modifier.testTag("student_status_$i"))
+            if (state.value("feedback_$i").isNotBlank()) {
+                Text("Observaciones de ${DemoProfiles.teacher.name}", fontWeight = FontWeight.Bold)
+                Text(state.value("feedback_$i"), modifier = Modifier.testTag("student_feedback_$i"))
+            }
+            if (state.value("sent_$i") == "true") {
+                Text("Versión enviada: ${state.value("submission_version_$i").ifBlank { "anterior" }}", style = MaterialTheme.typography.bodySmall)
+                val snapshot = state.submission(i)
+                if (AcademicContent.hitoSections(i).any { state.value("draft_$it") != snapshot[it].orEmpty() })
+                    Text("Tienes cambios guardados que todavía no has enviado.", style = MaterialTheme.typography.bodySmall)
+            }
             OutlinedTextField(date, { date = it; invalid = false }, label = { Text("Fecha límite (AAAA-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth(), isError = invalid)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
@@ -251,7 +264,9 @@ private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.
                     invalid = !date.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) || parsed == null
                     if (!invalid) save(mapOf("date_$i" to date))
                 }) { Text("Guardar fecha") }
-                TextButton(onClick = { save(mapOf("sent_$i" to if (state.value("sent_$i") == "true") "false" else "true")) }) { Text(if (state.value("sent_$i") == "true") "Deshacer envío" else "Marcar enviado") }
+                Button(onClick = { submit(i) }, modifier = Modifier.testTag("send_hito_$i")) { Text(if (state.value("sent_$i") == "true") "Enviar nueva versión" else "Enviar al profesor") }
+                if (state.value("sent_$i") == "true" && state.value("review_$i").isBlank())
+                    TextButton(onClick = { withdraw(i) }) { Text("Retirar envío") }
             }
             if (invalid) Text("Ingresa una fecha válida, por ejemplo 2026-12-15.", color = MaterialTheme.colorScheme.error)
         }
@@ -270,9 +285,9 @@ private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.
 }
 @Composable private fun Profile(state: TutorState, save: (Map<String, String>) -> Unit) = Page {
     val context = LocalContext.current
-    var name by rememberSaveable { mutableStateOf(state.value("name")) }
-    var email by rememberSaveable { mutableStateOf(state.value("email")) }
-    var course by rememberSaveable { mutableStateOf(state.value("course").ifBlank { "Trabajo de Título I" }) }
+    var name by rememberSaveable(state.activeProfileId) { mutableStateOf(state.value("name")) }
+    var email by rememberSaveable(state.activeProfileId) { mutableStateOf(state.value("email")) }
+    var course by rememberSaveable(state.activeProfileId) { mutableStateOf(state.value("course").ifBlank { "Trabajo de Título I" }) }
     var error by rememberSaveable { mutableStateOf(false) }
     var cameraUri by rememberSaveable { mutableStateOf("") }
     var photoError by remember { mutableStateOf("") }
@@ -283,7 +298,12 @@ private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.
         }.onFailure { photoError = "No se pudo abrir la imagen seleccionada." } }
     }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success -> if (success) save(mapOf("photo" to cameraUri)) }
-    Heading("Mi perfil", "Personaliza tu espacio académico")
+    Heading("Mi perfil", "Cuenta de demostración local")
+    Panel {
+        Text(if (state.isTeacher) "Profesor" else "Estudiante", fontWeight = FontWeight.Bold)
+        Text(if (state.isTeacher) "Estudiante asociado: ${DemoProfiles.student.name}" else "Profesor guía: ${DemoProfiles.teacher.name}")
+        Text("La asociación entre estas dos cuentas de prueba es fija.", style = MaterialTheme.typography.bodySmall)
+    }
     val bitmap = remember(state.value("photo")) { runCatching {
         context.contentResolver.openInputStream(Uri.parse(state.value("photo")))?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = 4 }) }
     }.getOrNull() }
@@ -302,12 +322,17 @@ private val symbols = listOf(R.drawable.ic_home, R.drawable.ic_book, R.drawable.
     }
     if (photoError.isNotBlank()) Text(photoError, color = MaterialTheme.colorScheme.error)
     Panel {
-        OutlinedTextField(name, { name = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth(), isError = error && name.isBlank())
-        OutlinedTextField(email, { email = it }, label = { Text("Correo") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth(), isError = error && !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches())
+        OutlinedTextField(name, { name = it }, readOnly = state.demoMode, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth(), isError = error && name.isBlank())
+        OutlinedTextField(email, { email = it }, readOnly = state.demoMode, label = { Text("Correo") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth(), isError = error && !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches())
         OutlinedTextField(course, { course = it }, label = { Text("Asignatura") }, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { error = name.isBlank() || course.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches(); if (!error) save(mapOf("name" to name.trim(), "email" to email.trim(), "course" to course.trim())) }) { Text("Guardar perfil") }
+        Button(onClick = { error = name.isBlank() || course.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches(); if (!error) save(if (state.demoMode) mapOf("course" to course.trim()) else mapOf("name" to name.trim(), "email" to email.trim(), "course" to course.trim())) }) { Text("Guardar perfil") }
         if (error) Text("Completa tu nombre, asignatura y un correo válido.", color = MaterialTheme.colorScheme.error)
     }
     if (state.value("name").isNotBlank()) Panel { Text("Perfil guardado", fontWeight = FontWeight.Bold); Text(state.value("name")); Text(state.value("email")); Text(state.value("course")) }
-    Progress(state.progress)
+    if (!state.isTeacher) Progress(state.progress)
+}
+
+@Composable private fun RoleNotice(home: () -> Unit) = Page {
+    Heading("Función de otro perfil", "Cambia de perfil para acceder a esta función.")
+    Button(onClick = home) { Text("Volver al inicio") }
 }

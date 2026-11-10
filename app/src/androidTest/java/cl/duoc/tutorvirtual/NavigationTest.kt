@@ -9,12 +9,19 @@ import org.junit.Test
 class NavigationTest {
     @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
     @Before fun start() {
-        composeRule.waitUntil(10000) {
-            composeRule.onAllNodesWithText("Comenzar  →").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithText("Bienvenido al Tutor Virtual").fetchSemanticsNodes().isNotEmpty()
+        lateinit var vm: cl.duoc.tutorvirtual.viewmodel.TutorViewModel
+        composeRule.runOnUiThread { vm = androidx.lifecycle.ViewModelProvider(composeRule.activity)[cl.duoc.tutorvirtual.viewmodel.TutorViewModel::class.java] }
+        composeRule.waitUntil(30000) { vm.state.value.loaded }
+        composeRule.runOnUiThread { vm.switchProfile(cl.duoc.tutorvirtual.data.model.DemoProfiles.student.id) }
+        composeRule.waitUntil(30000) { vm.state.value.activeProfileId == cl.duoc.tutorvirtual.data.model.DemoProfiles.student.id }
+        composeRule.waitUntil(30000) {
+            composeRule.onAllNodesWithTag("begin").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("nav_inicio").fetchSemanticsNodes().isNotEmpty()
         }
-        if (composeRule.onAllNodesWithText("Comenzar  →").fetchSemanticsNodes().isNotEmpty())
-            composeRule.onNodeWithText("Comenzar  →").performClick()
+        if (composeRule.onAllNodesWithTag("begin").fetchSemanticsNodes().isNotEmpty())
+            composeRule.onNodeWithTag("begin").performClick()
+        composeRule.onNodeWithTag("nav_inicio").performClick()
+        composeRule.waitUntil(30000) { composeRule.onAllNodesWithTag("dashboard").fetchSemanticsNodes().isNotEmpty() }
     }
     @Test fun guideUsesRepositoryAndOpensDetails() {
         composeRule.onNodeWithTag("nav_unidades").performClick()
@@ -24,7 +31,8 @@ class NavigationTest {
     }
     @Test fun projectDraftSurvivesActivityRecreation() {
         composeRule.onNodeWithTag("nav_anteproyecto").performClick()
-        composeRule.onAllNodesWithText("Problema de investigación")[0].performScrollTo().performClick()
+        if (composeRule.onAllNodesWithText("Tu borrador").fetchSemanticsNodes().isEmpty())
+            composeRule.onAllNodesWithText("Problema de investigación")[0].performScrollTo().performClick()
         composeRule.onNodeWithText("Tu borrador").performTextReplacement("Analizar las necesidades de seguridad de una comunidad delimitada.")
         composeRule.onNodeWithText("Completar").performScrollTo().performClick()
         composeRule.waitUntil(5000) {
@@ -34,8 +42,13 @@ class NavigationTest {
         composeRule.waitForIdle()
         composeRule.onAllNodesWithText("Analizar las necesidades de seguridad de una comunidad delimitada.")[0].assertExists()
     }
+    @Test fun journeyStageOpensItsOwnDraft() {
+        composeRule.onNodeWithTag("stage_4").performScrollTo().performClick()
+        composeRule.onNodeWithText("Resultados y conclusiones").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Tu borrador").assertExists()
+    }
     @Test fun progressShowsAcademicMilestones() {
-        composeRule.onNodeWithTag("nav_avances").performClick()
+        composeRule.onNodeWithTag("nav_avances").performScrollTo().performClick()
         composeRule.onNodeWithText("Mis Hitos Académicos").assertIsDisplayed()
         composeRule.onNodeWithText("Hito 1: Definición del tema").assertIsDisplayed()
     }

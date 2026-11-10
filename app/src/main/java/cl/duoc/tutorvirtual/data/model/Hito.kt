@@ -4,6 +4,7 @@ enum class EstadoHito {
     POR_INICIAR,
     EN_DESARROLLO,
     ENVIADO,
+    CON_OBSERVACIONES,
     APROBADO
 }
 
