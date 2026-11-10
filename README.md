@@ -28,6 +28,9 @@ Abrir esta carpeta con Android Studio, sincronizar Gradle y ejecutar el módulo 
 
 APK de depuración: `app/build/outputs/apk/debug/app-debug.apk`.
 
+APK disponible en GitHub: [Descargar Tutor Virtual ESUCAR](apk/TutorVirtual-ESUCAR.apk).
+La carpeta `output/` contiene archivos locales de trabajo y está excluida del repositorio.
+
 Si el JDK de Windows muestra `Unable to establish loopback connection`, utilizar `tools/verify.ps1`, que configura una ruta temporal corta únicamente para el proceso de verificación.
 
 ## Organización
